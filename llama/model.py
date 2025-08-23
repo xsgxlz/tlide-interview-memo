@@ -274,8 +274,14 @@ class Transformer(nn.Module):
             params.rope_theta,
         )
 
+    def clear_cache(self):
+        for layer in self.layers:
+            attention_layer = layer.attention
+            attention_layer.cache_k.fill_(0)
+            attention_layer.cache_v.fill_(0)
+
     @torch.inference_mode()
-    def forward(self, tokens: torch.Tensor, start_pos: int):
+    def forward(self, tokens: torch.Tensor, start_pos: int, return_last_hidden: bool):
         _bsz, seqlen = tokens.shape
         h = self.tok_embeddings(tokens)
         self.freqs_cis = self.freqs_cis.to(h.device)
@@ -298,5 +304,8 @@ class Transformer(nn.Module):
         for layer in self.layers:
             h = layer(h, start_pos, freqs_cis, mask)
         h = self.norm(h)
-        output = self.output(h).float()
+        if return_last_hidden:
+            output = h.float()
+        else:
+            output = self.output(h).float()
         return output
