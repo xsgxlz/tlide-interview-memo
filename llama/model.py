@@ -157,10 +157,19 @@ class Attention(nn.Module):
                 self.head_dim,
             )
         ).cuda()
+        self.cache_q = torch.zeros(
+            (
+                args.max_batch_size,
+                args.max_seq_len,
+                self.n_local_heads,
+                self.head_dim,
+            )
+        ).cuda()
 
-    def update_default_kv_cache(self, xk: torch.Tensor, xv: torch.Tensor, bsz: int, start_pos: int, seqlen: int):
+    def update_default_qkv_cache(self, xq: torch.Tensor, xk: torch.Tensor, xv: torch.Tensor, bsz: int, start_pos: int, seqlen: int):
         self.cache_k[:bsz, start_pos : start_pos + seqlen] = xk
         self.cache_v[:bsz, start_pos : start_pos + seqlen] = xv
+        self.cache_q[:bsz, start_pos : start_pos + seqlen] = xq
 
         keys = self.cache_k[:bsz, : start_pos + seqlen]
         values = self.cache_v[:bsz, : start_pos + seqlen]
@@ -183,7 +192,7 @@ class Attention(nn.Module):
 
         xq, xk = apply_rotary_emb(xq, xk, freqs_cis=freqs_cis)
 
-        keys, values = self.update_default_kv_cache(xk, xv, bsz, start_pos, seqlen)
+        keys, values = self.update_default_qkv_cache(xq, xk, xv, bsz, start_pos, seqlen)
 
         # repeat k/v heads if n_kv_heads < n_heads
         keys = repeat_kv(
